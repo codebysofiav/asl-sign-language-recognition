@@ -1,0 +1,11 @@
+# Exploración y notebooks
+jupyter
+ipykernel
+numpy
+pandas
+matplotlib
+Pillow
+
+# Modelado y evaluación
+tensorflow
+scikit-learn
