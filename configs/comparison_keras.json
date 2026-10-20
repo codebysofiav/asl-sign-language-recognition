@@ -1,0 +1,25 @@
+{
+  "models_to_run": [
+    "cnn",
+    "resnet50v2",
+    "efficientnetb0"
+  ],
+  "pretrained_weights": "imagenet",
+  "train_base": false,
+  "checkpoint_paths": {
+    "cnn": "models/baseline_best.keras",
+    "resnet50v2": "models/resnet50v2_best.keras",
+    "efficientnetb0": "models/efficientnetb0_best.keras"
+  },
+  "history_paths": {
+    "cnn": "results/metrics/baseline_history.csv",
+    "resnet50v2": "results/metrics/resnet50v2_history.csv",
+    "efficientnetb0": "results/metrics/efficientnetb0_history.csv"
+  },
+  "training_summary_paths": {
+    "cnn": "results/metrics/baseline_training_summary.json",
+    "resnet50v2": "results/metrics/resnet50v2_training_summary.json",
+    "efficientnetb0": "results/metrics/efficientnetb0_training_summary.json"
+  },
+  "comparison_table_path": "results/metrics/keras_model_comparison.csv"
+}

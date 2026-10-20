@@ -4,7 +4,7 @@ Proyecto académico de IA2 para clasificar imágenes de señas del alfabeto de l
 
 ## Estado
 
-El repositorio está en etapa inicial. El análisis de datos comienza en `notebooks/01_exploracion_datos.ipynb`; todavía se debe descargar el dataset y verificar su estructura y contenido antes de definir rutas o cantidades.
+El dataset ya fue explorado y el preprocesamiento está verificado. La copia local contiene 29 clases con 3.000 imágenes por clase, JPEG RGB de 200 × 200. El test incluido en Kaggle contiene 28 imágenes que son copias exactas de ejemplos de entrenamiento, por lo que no se usa como evaluación independiente. Las particiones de desarrollo se crean desde entrenamiento con una semilla fija.
 
 ## Dataset
 
@@ -12,8 +12,8 @@ Dataset inicial: [ASL Alphabet en Kaggle](https://www.kaggle.com/datasets/grassk
 
 1. Descarga el dataset desde Kaggle y extrae los archivos en `data/raw/`.
 2. No subas imágenes del dataset a GitHub. La carpeta `data/raw/` está excluida por `.gitignore`.
-3. Abre `notebooks/01_exploracion_datos.ipynb` y configura allí la ruta local si la estructura extraída lo requiere.
-4. Registra en el notebook la estructura, conteos y observaciones reales; no des por hecho nombres de carpetas o cantidad de imágenes.
+3. Revisa `notebooks/01_exploracion_datos.ipynb` para comprobar estructura, conteos y calidad de tu copia.
+4. Usa `notebooks/02_preprocesamiento.ipynb` para crear particiones estratificadas y verificar que no haya duplicados exactos entre ellas.
 
 Cada integrante necesita obtener su propia copia local del dataset o coordinar un almacenamiento compartido aprobado. El código debe trabajar con rutas configurables y relativas al repositorio, no con rutas absolutas de una computadora.
 
@@ -47,10 +47,12 @@ test/          Pruebas del proyecto
 
 ## Plan de trabajo
 
-1. Explorar y verificar el dataset.
-2. Diseñar el preprocesamiento y las particiones sin fuga de datos.
-3. Entrenar una CNN base reproducible.
-4. Evaluar y documentar resultados.
-5. Después de estabilizar la línea base, explorar transferencia de aprendizaje y, si es viable, reconocimiento dinámico o en tiempo real.
+1. Exploración y preprocesamiento: completados y documentados en los notebooks 01 y 02.
+2. Línea base y comparación Keras: `notebooks/03_entrenamiento_baseline.ipynb` y `notebooks/04_comparacion_modelos_keras.ipynb` permiten entrenar CNN, ResNet-50V2 y EfficientNetB0.
+3. `configs/baseline.json` y `configs/comparison_keras.json` guardan la configuración inicial. En el notebook 04 el entrenamiento y la evaluación final tienen interruptores separados; la evaluación usa la partición de prueba reservada.
+4. El notebook 04 guarda checkpoints bajo `models/` y, bajo `results/metrics/`, historiales por época, resúmenes de entrenamiento, métricas por clase, matrices de confusión y `keras_model_comparison.csv`.
+5. La transferencia de aprendizaje se ejecuta inicialmente con las bases preentrenadas congeladas. El ajuste fino, PyTorch/ResNet-18 y el reconocimiento en tiempo real quedan para pasos posteriores.
+
+Para ejecutar el notebook 04 en un clúster, prepara allí el mismo entorno Python, instala `requirements.txt`, coloca el dataset en la estructura `data/raw/` y selecciona el kernel del entorno. TensorFlow debe detectar la GPU del clúster; los pesos ImageNet de Keras pueden requerir una descarga en el primer uso. No subas modelos grandes a GitHub.
 
 No se deben subir al repositorio datasets completos, credenciales, entornos virtuales ni archivos grandes de entrenamiento. Las métricas y figuras que se decida conservar para documentar experimentos deben revisarse antes de agregarlas a Git.

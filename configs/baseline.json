@@ -1,0 +1,16 @@
+{
+  "seed": 42,
+  "validation_fraction": 0.15,
+  "test_fraction": 0.15,
+  "image_size": [
+    200,
+    200
+  ],
+  "batch_size": 32,
+  "epochs": 20,
+  "early_stopping_patience": 5,
+  "learning_rate": 0.001,
+  "dropout_rate": 0.4,
+  "checkpoint_path": "models/baseline_best.keras",
+  "history_path": "results/metrics/baseline_history.csv"
+}
