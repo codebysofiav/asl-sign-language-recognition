@@ -1,0 +1,20 @@
+# Experimento baseline: CNN propia entrenada desde cero.
+data:
+  raw_dir: data/raw/asl_alphabet_train/asl_alphabet_train
+  split: {train: 0.70, val: 0.15, test: 0.15}
+  seed: 42
+  img_size: [128, 128]
+  batch_size: 64
+
+model:
+  filters: [32, 64, 128, 256]
+  dense_units: 128
+  dropout: 0.4
+
+train:
+  epochs: 30
+  learning_rate: 0.001
+  mixed_precision: true        # float16 en la GPU: más rápido y menos VRAM
+  monitor: val_accuracy        # métrica para elegir best.keras
+  early_stopping_patience: 6
+  reduce_lr_patience: 2

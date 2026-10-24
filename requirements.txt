@@ -5,7 +5,11 @@ numpy
 pandas
 matplotlib
 Pillow
+pyyaml
 
-# Modelado y evaluación
-tensorflow
+# Modelado y evaluación (GPU NVIDIA vía CUDA en WSL2; requiere Python 3.10-3.13)
+tensorflow[and-cuda]
 scikit-learn
+
+# Pruebas
+pytest
