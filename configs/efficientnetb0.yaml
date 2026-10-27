@@ -1,0 +1,23 @@
+# Transfer learning: EfficientNetB0 preentrenada en ImageNet, en dos fases.
+data:
+  raw_dir: data/raw/asl_alphabet_train/asl_alphabet_train
+  split: {train: 0.70, val: 0.15, test: 0.15}
+  seed: 42
+  img_size: [128, 128]
+  batch_size: 64
+
+model:
+  name: efficientnetb0
+  weights: imagenet
+  dropout: 0.3
+
+train:
+  epochs_head: 3               # fase 1: base congelada, solo la cabeza
+  epochs_finetune: 12          # fase 2: se descongelan las últimas capas (máximo)
+  lr_head: 0.001
+  lr_finetune: 0.00005
+  unfreeze_layers: 40
+  mixed_precision: true
+  monitor: val_accuracy
+  early_stopping_patience: 4   # solo en la fase 2
+  reduce_lr_patience: 2

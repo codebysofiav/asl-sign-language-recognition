@@ -13,6 +13,13 @@ Cada corrida vive en experiments/AAAAMMDD-HHMM_<name>/ con:
 
 Si se interrumpe, volver a lanzar el mismo comando reanuda la corrida inconclusa
 más reciente con ese nombre. Usa --new para forzar una corrida nueva.
+
+Dos tipos de configuración (según model.name):
+    baseline                    train.epochs, train.learning_rate
+    mobilenetv2/efficientnetb0  transfer learning en dos fases:
+        fase 1: base congelada, solo la cabeza (epochs_head, lr_head)
+        fase 2: se descongelan las últimas capas de la base (epochs_finetune, lr_finetune)
+    Las épocas se cuentan en total (fase 1 + fase 2) y la reanudación respeta la fase.
 """
 import argparse
 import csv
@@ -20,6 +27,7 @@ import json
 import os
 import re
 import shutil
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -28,7 +36,7 @@ from tensorflow import keras
 
 from src.data import build_datasets
 from src.evaluate import evaluate_model, plot_curves
-from src.model import build_baseline, compile_model
+from src.model import build_model, compile_model, set_finetune_layers
 
 EXPERIMENTS_DIR = Path("experiments")
 
@@ -83,6 +91,9 @@ class CheckpointManager(keras.callbacks.Callback):
         self.run_dir, self.monitor, self.state = run_dir, monitor, state
         self.mode_max = "loss" not in monitor
 
+    def on_epoch_begin(self, epoch, logs=None):
+        self._t0 = time.time()
+
     def on_epoch_end(self, epoch, logs=None):
         logs = {k: float(v) for k, v in (logs or {}).items()}
         lr = float(keras.ops.convert_to_numpy(self.model.optimizer.learning_rate))
@@ -96,7 +107,7 @@ class CheckpointManager(keras.callbacks.Callback):
         self.state["epoch"] = epoch + 1
         _write_json(self.run_dir / "state.json", self.state)
 
-        row = {"epoch": epoch + 1, **logs, "lr": lr}
+        row = {"epoch": epoch + 1, **logs, "lr": lr, "time_s": round(time.time() - self._t0, 1)}
         hist = self.run_dir / "history.csv"
         new = not hist.exists()
         with open(hist, "a", newline="") as f:
@@ -106,9 +117,29 @@ class CheckpointManager(keras.callbacks.Callback):
             w.writerow(row)
 
 
+def _run_fit(model, datasets, run_dir, state, t, initial_epoch, epochs, early_stop):
+    callbacks = [
+        CheckpointManager(run_dir, t["monitor"], state),
+        keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=t["reduce_lr_patience"], min_lr=1e-6),
+    ]
+    if early_stop:
+        callbacks.append(keras.callbacks.EarlyStopping(monitor=t["monitor"], patience=t["early_stopping_patience"]))
+    model.fit(
+        datasets["train"],
+        validation_data=datasets["val"],
+        epochs=epochs,
+        initial_epoch=initial_epoch,
+        callbacks=callbacks,
+        shuffle=False,  # el barajado ya lo hace tf.data
+        verbose=2,
+    )
+
+
 def train(config_path, name, resume=True):
     cfg = load_config(config_path)
     t = cfg["train"]
+    model_name = cfg["model"].get("name", "baseline")
+    transfer = model_name != "baseline"
     keras.utils.set_random_seed(cfg["data"]["seed"])
     _setup_gpu()
     if t.get("mixed_precision"):
@@ -117,31 +148,32 @@ def train(config_path, name, resume=True):
     datasets, class_names, _ = build_datasets(cfg)
     run_dir, resuming = find_run(name, resume)
     shutil.copy(config_path, run_dir / "config.yaml")
-    print(f"Corrida: {run_dir} ({'reanudando' if resuming else 'nueva'})")
+    print(f"Corrida: {run_dir} ({'reanudando' if resuming else 'nueva'}) | modelo: {model_name}")
 
     if resuming:
         model = keras.models.load_model(run_dir / "last.keras")
         state = json.loads((run_dir / "state.json").read_text())
     else:
         img_size = tuple(cfg["data"]["img_size"])
-        model = compile_model(build_baseline(len(class_names), img_size, cfg), t["learning_rate"])
+        model = build_model(model_name, len(class_names), img_size, cfg)
+        compile_model(model, t["lr_head"] if transfer else t["learning_rate"])
         state = {"epoch": 0, "best": None, "status": "running"}
         _write_json(run_dir / "state.json", state)
 
-    callbacks = [
-        CheckpointManager(run_dir, t["monitor"], state),
-        keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=t["reduce_lr_patience"], min_lr=1e-6),
-        keras.callbacks.EarlyStopping(monitor=t["monitor"], patience=t["early_stopping_patience"]),
-    ]
-    model.fit(
-        datasets["train"],
-        validation_data=datasets["val"],
-        epochs=t["epochs"],
-        initial_epoch=state["epoch"],
-        callbacks=callbacks,
-        shuffle=False,  # el barajado ya lo hace tf.data
-        verbose=2,
-    )
+    if not transfer:
+        _run_fit(model, datasets, run_dir, state, t, state["epoch"], t["epochs"], early_stop=True)
+    else:
+        head, total = t["epochs_head"], t["epochs_head"] + t["epochs_finetune"]
+        if state["epoch"] < head:  # fase 1: sin early stopping, siempre llega a `head`
+            print(f"--- Fase 1: cabeza (base congelada), épocas 1-{head}")
+            _run_fit(model, datasets, run_dir, state, t, state["epoch"], head, early_stop=False)
+        if state["epoch"] >= head:  # fase 2
+            print(f"--- Fase 2: fine-tuning de las últimas {t['unfreeze_layers']} capas, épocas {head + 1}-{total}")
+            fresh = state["epoch"] == head  # transición: recompilar con lr bajo
+            set_finetune_layers(model, t["unfreeze_layers"])
+            if fresh:
+                compile_model(model, t["lr_finetune"])
+            _run_fit(model, datasets, run_dir, state, t, state["epoch"], total, early_stop=True)
 
     # Cierre: modelo final = mejor checkpoint; evaluación en test; curvas.
     best = keras.models.load_model(run_dir / "best.keras")
@@ -150,6 +182,10 @@ def train(config_path, name, resume=True):
     (run_dir / "final" / "classes.json").write_text(json.dumps(class_names))
     metrics = evaluate_model(best, datasets["test"], class_names, run_dir)
     plot_curves(run_dir / "history.csv", run_dir / "curves.png")
+    _write_json(
+        run_dir / "model_info.json",
+        {"model": model_name, "params": int(best.count_params()), "epochs_run": state["epoch"]},
+    )
     state["status"] = "done"
     _write_json(run_dir / "state.json", state)
     print(f"Test accuracy: {metrics['accuracy']:.4f} | Resultados en {run_dir}")
