@@ -47,6 +47,23 @@ def summary_table(runs):
     return pd.DataFrame.from_dict({label: summarize_run(rd) for label, rd in runs.items()}, orient="index")
 
 
+def pipeline_summary_table(runs, metrics_file="pipeline_metrics.json"):
+    """Resumen end-to-end: incluye detección de mano y clasificación."""
+    rows = {}
+    for label, run_dir in runs.items():
+        metrics_path = Path(run_dir) / metrics_file
+        if not metrics_path.exists():
+            continue
+        metrics = json.loads(metrics_path.read_text())
+        rows[label] = {
+            "accuracy flujo completo": round(metrics["accuracy"], 4),
+            "macro F1 flujo completo": round(metrics["report"]["macro avg"]["f1-score"], 4),
+            "detección en señas": round(metrics["hand_detection_rate_on_signs"], 4),
+            "manos no detectadas": metrics["missed_hand_count"],
+        }
+    return pd.DataFrame.from_dict(rows, orient="index")
+
+
 def plot_comparison(runs):
     """val_accuracy y val_loss por época; línea punteada = inicio del fine-tuning."""
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))

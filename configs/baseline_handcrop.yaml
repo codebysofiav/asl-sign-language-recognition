@@ -1,0 +1,23 @@
+# Mismo baseline CNN del experimento original; solo cambia el preprocesamiento de entrada.
+data:
+  raw_dir: data/raw/asl_alphabet_train/asl_alphabet_train
+  image_dir: data/processed/hand_crops/asl_alphabet_train
+  crop_manifest: data/processed/hand_crops/asl_alphabet_train_manifest.csv
+  no_hand_class: nothing
+  split: {train: 0.70, val: 0.15, test: 0.15}
+  seed: 42
+  img_size: [128, 128]
+  batch_size: 64
+
+model:
+  filters: [32, 64, 128, 256]
+  dense_units: 128
+  dropout: 0.4
+
+train:
+  epochs: 30
+  learning_rate: 0.001
+  mixed_precision: true
+  monitor: val_accuracy
+  early_stopping_patience: 6
+  reduce_lr_patience: 2

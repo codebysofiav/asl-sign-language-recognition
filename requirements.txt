@@ -11,5 +11,8 @@ pyyaml
 tensorflow[and-cuda]
 scikit-learn
 
+# Extracción de puntos de referencia de manos
+mediapipe==0.10.35
+
 # Pruebas
 pytest

@@ -35,7 +35,7 @@ import yaml
 from tensorflow import keras
 
 from src.data import build_datasets
-from src.evaluate import evaluate_model, plot_curves
+from src.evaluate import evaluate_hand_pipeline, evaluate_model, plot_curves
 from src.model import build_model, compile_model, set_finetune_layers
 
 EXPERIMENTS_DIR = Path("experiments")
@@ -145,7 +145,7 @@ def train(config_path, name, resume=True):
     if t.get("mixed_precision"):
         keras.mixed_precision.set_global_policy("mixed_float16")
 
-    datasets, class_names, _ = build_datasets(cfg)
+    datasets, class_names, splits = build_datasets(cfg)
     run_dir, resuming = find_run(name, resume)
     shutil.copy(config_path, run_dir / "config.yaml")
     print(f"Corrida: {run_dir} ({'reanudando' if resuming else 'nueva'}) | modelo: {model_name}")
@@ -181,6 +181,23 @@ def train(config_path, name, resume=True):
     best.save(run_dir / "final" / "model.keras")
     (run_dir / "final" / "classes.json").write_text(json.dumps(class_names))
     metrics = evaluate_model(best, datasets["test"], class_names, run_dir)
+    if cfg["data"].get("crop_manifest"):
+        test_rows = splits[splits.split == "test"]
+        pipeline_metrics = evaluate_hand_pipeline(
+            best,
+            test_rows,
+            cfg["data"].get("image_dir", cfg["data"]["raw_dir"]),
+            cfg["data"]["crop_manifest"],
+            class_names,
+            cfg["data"]["img_size"],
+            cfg["data"]["batch_size"],
+            run_dir,
+        )
+        print(
+            "Test end-to-end (incluye fallos de detección): "
+            f"accuracy={pipeline_metrics['accuracy']:.4f}, "
+            f"detección en señas={pipeline_metrics['hand_detection_rate_on_signs']:.1%}"
+        )
     plot_curves(run_dir / "history.csv", run_dir / "curves.png")
     _write_json(
         run_dir / "model_info.json",

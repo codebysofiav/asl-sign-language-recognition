@@ -77,9 +77,25 @@ def build_datasets(cfg):
     class_names = list_classes(d["raw_dir"])
     splits = make_splits(d["raw_dir"], d["split"], d["seed"])
     size = tuple(d["img_size"])
+    image_dir = d.get("image_dir", d["raw_dir"])
+    crop_manifest = d.get("crop_manifest")
+    if crop_manifest:
+        manifest = pd.read_csv(crop_manifest)
+        detected = set(manifest.loc[manifest.detected.astype(bool), "path"])
+        no_hand_class = d.get("no_hand_class", "nothing")
+        # Missed detections are excluded from fitting; end-to-end evaluation includes them
+        # and maps them to no_hand_class, matching the intended inference pipeline.
+        fit_splits = splits.copy()
+        fit_splits["detected"] = fit_splits.path.isin(detected)
+        fit_splits = fit_splits[
+            fit_splits.detected | (fit_splits.label.str.lower() == no_hand_class.lower())
+        ]
+    else:
+        fit_splits = splits
     datasets = {
         s: make_dataset(
-            splits[splits.split == s], d["raw_dir"], class_names, size,
+            fit_splits[fit_splits.split == s] if crop_manifest else splits[splits.split == s],
+            image_dir, class_names, size,
             d["batch_size"], training=(s == "train"), seed=d["seed"],
         )
         for s in ("train", "val", "test")
