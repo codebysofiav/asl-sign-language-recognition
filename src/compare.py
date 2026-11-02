@@ -90,3 +90,39 @@ def evaluate_on_photos(runs, photos_df):
         }
         details[label] = res
     return pd.DataFrame.from_dict(rows, orient="index"), details
+
+
+def plot_photo_confusions(details, class_names, save_dir=None):
+    """Una matriz de confusión por modelo sobre las fotos propias.
+
+    `details` es el segundo valor que devuelve evaluate_on_photos. El color es la
+    fracción de cada letra real (por filas); el número es la cantidad de fotos.
+    """
+    from sklearn.metrics import confusion_matrix
+
+    idx = {c: i for i, c in enumerate(class_names)}
+    labels = list(range(len(class_names)))
+    for model, res in details.items():
+        y_true = res.true_id.to_numpy()
+        y_pred = res.pred.map(idx).to_numpy()
+        counts = confusion_matrix(y_true, y_pred, labels=labels)
+        norm = confusion_matrix(y_true, y_pred, labels=labels, normalize="true")
+
+        fig, ax = plt.subplots(figsize=(12, 10.5))
+        im = ax.imshow(norm, cmap="Blues", vmin=0, vmax=1)
+        for i in labels:
+            for j in labels:
+                if counts[i, j]:
+                    ax.text(j, i, counts[i, j], ha="center", va="center", fontsize=6,
+                            color="white" if norm[i, j] > 0.5 else "black")
+        ax.set_xticks(labels, class_names, rotation=90)
+        ax.set_yticks(labels, class_names)
+        ax.set_xlabel("Predicha")
+        ax.set_ylabel("Real")
+        ax.set_title(f"{model} · fotos propias ({res.correct.mean():.1%} de acierto)")
+        fig.colorbar(im, fraction=0.046, pad=0.04)
+        fig.tight_layout()
+        if save_dir:
+            Path(save_dir).mkdir(parents=True, exist_ok=True)
+            fig.savefig(Path(save_dir) / f"confusion_fotos_{model}.png", dpi=120)
+        plt.show()
