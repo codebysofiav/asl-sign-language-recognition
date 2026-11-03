@@ -1,5 +1,5 @@
 # Clasificación de señas del alfabeto ASL
-
+![Imagen de la seña](https://github.com/codebysofiav/asl-sign-language-recognition/blob/main/image.png)
 Proyecto académico de IA2 para clasificar imágenes de señas del alfabeto de la Lengua de Señas Americana (ASL) mediante redes neuronales convolucionales. La primera meta es construir y evaluar una línea base reproducible con imágenes estáticas. El reconocimiento dinámico y en tiempo real queda como trabajo posterior, sujeto al tiempo y a los recursos disponibles.
 
 ## Estado
