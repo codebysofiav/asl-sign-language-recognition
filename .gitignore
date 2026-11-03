@@ -7,23 +7,25 @@ __pycache__/
 venv/
 env/
 
-# Jupyter
+# Jupyter and test caches
 .ipynb_checkpoints/
+.pytest_cache/
 
 # Local data and generated artifacts
-data/raw/*
-!data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
+data/
+experiments/
 models/*
 !models/.gitkeep
+*.zip
 
 # Local configuration and secrets
 .env
 .env.*
 !.env.example
 
-# OS / editor
+# OS, editor, and CUDA files
 .DS_Store
 Thumbs.db
 .vscode/
+ptxas
+*:Zone.Identifier
