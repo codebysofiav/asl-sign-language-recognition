@@ -12,4 +12,5 @@ experiments/
 # Enlaces/archivos locales de Windows y CUDA
 ptxas
 *:Zone.Identifier
-EOF
+EOF.venv-mp/
+assets/
