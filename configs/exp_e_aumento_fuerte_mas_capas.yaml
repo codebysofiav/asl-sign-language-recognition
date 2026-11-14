@@ -1,0 +1,39 @@
+# Experimento E: B descongelando 80 capas en la fase 2 y 12 épocas de fine-tuning.
+data:
+  raw_dir: data/raw/asl_alphabet_train/asl_alphabet_train
+  split: {train: 0.70, val: 0.15, test: 0.15}
+  seed: 42
+  img_size: [128, 128]
+  batch_size: 64
+  train_per_class: 700     # 20.300 imágenes de entrenamiento (de 60.900)
+  val_per_class: 100
+  test_per_class: 100
+
+model:
+  name: mobilenetv2
+  weights: imagenet
+  dropout: 0.3
+
+# Aumento fuerte: más rango de zoom y de traslación, cambios de brillo/contraste/saturación,
+# desenfoque y borrado aleatorio. Rotación reducida a ±11° (I y J se distinguen por la orientación).
+augment:
+  rotation: 0.03
+  zoom: 0.3
+  translation: 0.1
+  brightness: 0.3
+  contrast: 0.3
+  saturation: 0.3
+  hue: 0.0
+  blur: 0.3
+  erasing: 0.3
+
+train:
+  epochs_head: 3
+  epochs_finetune: 12
+  lr_head: 0.001
+  lr_finetune: 0.00005
+  unfreeze_layers: 80
+  mixed_precision: true
+  monitor: val_accuracy
+  early_stopping_patience: 3
+  reduce_lr_patience: 2

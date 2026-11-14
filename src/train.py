@@ -20,6 +20,11 @@ Dos tipos de configuración (según model.name):
         fase 1: base congelada, solo la cabeza (epochs_head, lr_head)
         fase 2: se descongelan las últimas capas de la base (epochs_finetune, lr_finetune)
     Las épocas se cuentan en total (fase 1 + fase 2) y la reanudación respeta la fase.
+
+Opciones extra (todas opcionales):
+    augment:                  aumento de datos configurable (ver src/model.py)
+    train.label_smoothing     suavizado de etiquetas (usa pérdida categórica con one-hot)
+    data.train_per_class, data.val_per_class, data.test_per_class   muestra por clase
 """
 import argparse
 import csv
@@ -28,6 +33,7 @@ import os
 import re
 import shutil
 import time
+import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -64,7 +70,17 @@ def _setup_gpu():
 
     gpus = tf.config.list_physical_devices("GPU")
     for g in gpus:
-        tf.config.experimental.set_memory_growth(g, True)  # comparte VRAM con Windows
+        try:
+            if not tf.config.experimental.get_memory_growth(g):
+                tf.config.experimental.set_memory_growth(g, True)
+        except RuntimeError as exc:
+            warnings.warn(
+                f"No se pudo activar memory growth para {g}: {exc}. "
+                "La GPU ya fue inicializada; reinicia el kernel y configura la GPU "
+                "antes de ejecutar otras celdas de TensorFlow.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
     print(f"GPUs detectadas: {gpus or 'ninguna (se usará CPU)'}")
 
 
@@ -140,8 +156,9 @@ def train(config_path, name, resume=True):
     t = cfg["train"]
     model_name = cfg["model"].get("name", "baseline")
     transfer = model_name != "baseline"
-    keras.utils.set_random_seed(cfg["data"]["seed"])
+    smoothing = t.get("label_smoothing", 0.0)
     _setup_gpu()
+    keras.utils.set_random_seed(cfg["data"]["seed"])
     if t.get("mixed_precision"):
         keras.mixed_precision.set_global_policy("mixed_float16")
 
@@ -156,7 +173,7 @@ def train(config_path, name, resume=True):
     else:
         img_size = tuple(cfg["data"]["img_size"])
         model = build_model(model_name, len(class_names), img_size, cfg)
-        compile_model(model, t["lr_head"] if transfer else t["learning_rate"])
+        compile_model(model, t["lr_head"] if transfer else t["learning_rate"], smoothing)
         state = {"epoch": 0, "best": None, "status": "running"}
         _write_json(run_dir / "state.json", state)
 
@@ -172,7 +189,7 @@ def train(config_path, name, resume=True):
             fresh = state["epoch"] == head  # transición: recompilar con lr bajo
             set_finetune_layers(model, t["unfreeze_layers"])
             if fresh:
-                compile_model(model, t["lr_finetune"])
+                compile_model(model, t["lr_finetune"], smoothing)
             _run_fit(model, datasets, run_dir, state, t, state["epoch"], total, early_stop=True)
 
     # Cierre: modelo final = mejor checkpoint; evaluación en test; curvas.

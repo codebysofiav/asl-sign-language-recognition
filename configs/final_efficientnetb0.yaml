@@ -1,0 +1,35 @@
+data:
+  raw_dir: data/raw/asl_alphabet_train/asl_alphabet_train
+  split:
+    train: 0.7
+    val: 0.15
+    test: 0.15
+  seed: 42
+  img_size:
+  - 128
+  - 128
+  batch_size: 64
+model:
+  name: efficientnetb0
+  weights: imagenet
+  dropout: 0.3
+augment:
+  rotation: 0.03
+  zoom: 0.3
+  translation: 0.1
+  brightness: 0.3
+  contrast: 0.3
+  saturation: 0.3
+  hue: 0.0
+  blur: 0.3
+  erasing: 0.3
+train:
+  epochs_head: 3
+  epochs_finetune: 20
+  lr_head: 0.001
+  lr_finetune: 5.0e-05
+  unfreeze_layers: 40
+  mixed_precision: true
+  monitor: val_accuracy
+  early_stopping_patience: 4
+  reduce_lr_patience: 2

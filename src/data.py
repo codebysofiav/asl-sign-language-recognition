@@ -54,8 +54,19 @@ def make_splits(raw_dir, ratios, seed, cache_dir="data/processed"):
     return out
 
 
-def make_dataset(df, raw_dir, class_names, img_size, batch_size, training=False, seed=42):
-    """tf.data a partir de rutas; las imágenes se leen del disco bajo demanda."""
+def subsample(df, per_class, seed=42):
+    """Hasta `per_class` filas por clase (None = sin cambios). Sirve para experimentos rápidos."""
+    if not per_class:
+        return df
+    parts = [g.sample(min(len(g), per_class), random_state=seed) for _, g in df.groupby("label")]
+    return pd.concat(parts, ignore_index=True)
+
+
+def make_dataset(df, raw_dir, class_names, img_size, batch_size, training=False, seed=42, one_hot=False):
+    """tf.data a partir de rutas; las imágenes se leen del disco bajo demanda.
+
+    Las rutas absolutas en df.path se respetan (así se pueden mezclar fotos de otras carpetas).
+    one_hot=True devuelve etiquetas one-hot (necesario con label smoothing)."""
     idx = {c: i for i, c in enumerate(class_names)}
     paths = [str(Path(raw_dir) / p) for p in df.path]
     labels = df.label.map(idx).to_numpy("int32")
@@ -63,25 +74,34 @@ def make_dataset(df, raw_dir, class_names, img_size, batch_size, training=False,
     if training:
         ds = ds.shuffle(len(paths), seed=seed, reshuffle_each_iteration=True)
 
+    n_classes = len(class_names)
+
     def load(path, label):
         img = tf.io.decode_image(tf.io.read_file(path), channels=3, expand_animations=False)
         img.set_shape([None, None, 3])
+        if one_hot:
+            label = tf.one_hot(label, n_classes)
         return tf.image.resize(img, img_size), label
 
     return ds.map(load, num_parallel_calls=tf.data.AUTOTUNE).batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
 
 def build_datasets(cfg):
-    """Devuelve ({'train','val','test'}: tf.data, class_names, splits_df)."""
+    """Devuelve ({'train','val','test'}: tf.data, class_names, splits_df).
+
+    Opciones en cfg["data"]: train_per_class / val_per_class / test_per_class (muestra por clase).
+    Con cfg["train"]["label_smoothing"] > 0, train y val salen en one-hot (test siempre con enteros).
+    """
     d = cfg["data"]
+    one_hot = cfg.get("train", {}).get("label_smoothing", 0) > 0
     class_names = list_classes(d["raw_dir"])
     splits = make_splits(d["raw_dir"], d["split"], d["seed"])
     size = tuple(d["img_size"])
-    datasets = {
-        s: make_dataset(
-            splits[splits.split == s], d["raw_dir"], class_names, size,
-            d["batch_size"], training=(s == "train"), seed=d["seed"],
+    datasets = {}
+    for s in ("train", "val", "test"):
+        part = subsample(splits[splits.split == s], d.get(f"{s}_per_class"), d["seed"])
+        datasets[s] = make_dataset(
+            part, d["raw_dir"], class_names, size, d["batch_size"],
+            training=(s == "train"), seed=d["seed"], one_hot=(one_hot and s != "test"),
         )
-        for s in ("train", "val", "test")
-    }
     return datasets, class_names, splits
