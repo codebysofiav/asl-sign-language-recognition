@@ -13,6 +13,7 @@ scikit-learn
 
 # Extracción de puntos de referencia de manos
 mediapipe==0.10.35
+opencv-python
 
 # Pruebas
 pytest

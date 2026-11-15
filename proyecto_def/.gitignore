@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+artifacts/
+data/
+*.keras
+*.weights.h5
+*.npy
+*.npz
+*.task
+*.avi
+*.mp4
+*.mov
+*.mkv

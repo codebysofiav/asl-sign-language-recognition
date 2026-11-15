@@ -115,3 +115,14 @@ python scripts/train_landmark_classifier.py \
 ```
 
 Las imágenes, el archivo `.task`, las características `.npz` y el modelo quedan bajo carpetas excluidas de Git. El script guarda las métricas en `results/metrics/landmark_classifier.json`; revísalas antes de decidir si agregarlas al repositorio. Las pruebas de reconocimiento con fotos propias deben reportarse aparte del test interno del dataset.
+
+## Prototipo de cámara local
+
+`scripts/live_camera.py` carga el modelo estático de mapas de `09_pipeline_mapas_25k.ipynb` y, si existe, el modelo temporal J/Z de `07_pipeline_temporal_integracion.ipynb`. Descarga desde Drive a las rutas locales los modelos `.keras`, `classes.json` y `hand_landmarker.task`; esos artefactos no se guardan en Git.
+
+```bash
+python -m pip install -r requirements.txt
+python scripts/live_camera.py
+```
+
+Por defecto, busca el modelo estático en `data/processed/pipeline_mapas_25k/model/` y el temporal en `data/processed/video_flow/`. Si el modelo temporal aún no existe, la app funciona solo con el estático. Usa `S` para iniciar/detener la acumulación de letras, `C` para borrar el texto y `Q` para cerrar. La inferencia temporal usa ventanas deslizantes; su duración y umbrales son valores iniciales que deben calibrarse con clips reales.
