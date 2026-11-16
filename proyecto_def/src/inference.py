@@ -228,22 +228,34 @@ class RecognitionEngine:
         window = list(self.frames)
         frames = [item[0] for item in window]
         points = [item[1] for item in window]
-        if any(item is None for item in points):
-            self.latest_dynamic = ("other", 0.0, self.frame_index)
-            return
         if self.dynamic_type == "maps":
-            normalized = []
-            for frame, hand_points in zip(frames, points):
+            valid_indices = [i for i, hand_points in enumerate(points) if hand_points is not None]
+            if len(valid_indices) < 12:
+                self.latest_dynamic = ("other", 0.0, self.frame_index)
+                return
+            valid_points = []
+            for i in valid_indices:
+                frame, hand_points = frames[i], points[i]
                 h, w = frame.shape[:2]
                 denom = float(max(h, w))
-                normalized.append(np.column_stack((hand_points[:, 0] / denom, hand_points[:, 1] / denom,
-                                                   np.zeros(21, dtype=np.float32))))
-            # MediaPipe z is not available in the 2D points kept for the static branch.
-            # Keep a separate z-compatible sequence; the training renderer uses z only
-            # for interpolation and ignores it when drawing the map.
-            maps = render_video_map_sequence(np.stack(normalized))
+                valid_points.append(np.column_stack((hand_points[:, 0] / denom, hand_points[:, 1] / denom,
+                                                     np.zeros(21, dtype=np.float32))))
+            valid_points = np.stack(valid_points)
+            # Match Notebook 14: interpolate missing detections independently for
+            # every landmark coordinate across the 17 sampled frames.
+            points_sequence = np.empty((SEQUENCE_FRAMES, 21, 3), dtype=np.float32)
+            sample_positions = np.asarray(valid_indices, dtype=np.float32)
+            for point_idx in range(21):
+                for axis in range(3):
+                    points_sequence[:, point_idx, axis] = np.interp(
+                        np.arange(SEQUENCE_FRAMES), sample_positions, valid_points[:, point_idx, axis]
+                    )
+            maps = render_video_map_sequence(points_sequence)
             model_input = maps[None, ...]
         else:
+            if any(item is None for item in points):
+                self.latest_dynamic = ("other", 0.0, self.frame_index)
+                return
             gray = [cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
                     for crop in self._fixed_crops(frames, points)]
             flow = []
