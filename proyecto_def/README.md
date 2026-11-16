@@ -56,17 +56,23 @@ proyecto_def/artifacts/
 ├── crop/
 │   ├── model.keras
 │   └── classes.json
-└── video/
-    └── jz_flow_cnn.keras
+├── video_map/                 # recomendado: salida del Notebook 14
+    ├── jz_landmark_map_gru.keras
+    ├── classes.json
+    └── metadata.json
+└── video/                     # opcional: modelo anterior de flujo óptico
+    ├── jz_flow_cnn.keras
+    └── classes.json
 ```
 
 Rutas de origen en Drive:
 
 - Estático mapas: `exports/proyecto_def/maps/integrated_varied_1724/model.keras` y `classes.json`.
 - Estático recortes: `exports/proyecto_def/crop/integrated_varied_1724/model.keras` y `classes.json`.
-- Temporal: `exports/proyecto_def/video_balanced_v3/jz_flow_cnn.keras` (experimento de tres clases con split actualizado; si tu Drive conserva otra versión, usa la carpeta del entrenamiento que vas a evaluar).
+- Temporal preferido (Notebook 14): `exports/proyecto_def/video_map_sequence_v1/jz_landmark_map_gru.keras`, `classes.json`, `metadata.json` y `hand_landmarker.task`.
+- Temporal anterior de flujo óptico (fallback): `exports/proyecto_def/video_balanced_v3/jz_flow_cnn.keras` y `classes.json`.
 - Temporal binario con rechazo: `exports/proyecto_def/video_jz_reject_v1/jz_flow_binary.keras`, junto con `classes.json` y `reject_threshold.json`. Es salida experimental; todavía requiere integrarse en la app local.
-- Temporal mapas: `exports/proyecto_def/video_map_sequence_v1/jz_landmark_map_gru.keras`, junto con `classes.json`, `metadata.json` y `hand_landmarker.task`. Es salida experimental; la inferencia local requiere usar exactamente el mismo renderizado temporal.
+- El modelo temporal de mapas se integra en la app y tiene prioridad si ambos modelos temporales están instalados. Copia sus cuatro archivos según la estructura anterior. La inferencia local reproduce el muestreo de 17 landmarks, normalización de secuencia y renderizado de Notebook 14. El modo automático usa la postura inicial y movimiento como compuerta heurística; el modo temporal permite probar la rama sin esa compuerta.
 - MediaPipe: `exports/proyecto_def/hand_landmarker.task` (incluido también en las carpetas de exportación después de completar cada entrenamiento).
 
 La app necesita los dos archivos de la rama estática que vayas a seleccionar. Para el pipeline integrado también necesita el modelo temporal. El archivo `classes.json` conserva el orden de salida de la capa softmax. Los datos originales, los mapas/crops derivados, los flujos ópticos y los checkpoints no se necesitan para inferencia local.
@@ -85,9 +91,9 @@ python app.py
 
 Antes de descargar los modelos, puedes verificar solo la interfaz y la cámara con `python app.py --preview-only`. Para instalar únicamente lo que necesita esa vista previa, usa `python -m pip install -r requirements-preview.txt`. Este modo no carga TensorFlow/MediaPipe, no clasifica señas ni guarda texto.
 
-La ventana muestra la vista previa y la predicción en vivo. La rama temporal se arma al estabilizar una postura inicial candidata de J (meñique extendido) o Z (índice extendido), y se activa cuando empieza a moverse ese dedo; mientras clasifica el movimiento, la predicción estática se suprime. Una postura estática candidata expira y vuelve a la clasificación estática. Estos umbrales geométricos son heurísticos iniciales y deben ajustarse probando la cámara. El menú permite elegir mapas o recortes. **Iniciar captura** comienza a acumular letras estables; **Detener y revisar texto** pausa la captura y ofrece sugerencias ortográficas en inglés con un diccionario local. `space` separa palabras, `del` borra el último carácter y `nothing`/`other` no añaden letras. El corrector es una sugerencia ortográfica por palabra, no un modelo de gramática ni un traductor de lengua de señas.
+La ventana muestra la vista previa y la predicción en vivo. El menú de representación elige mapas o recortes para letras estáticas; el menú de enrutamiento elige `auto`, `static` o `dynamic`. `auto` conserva la compuerta heurística: estabiliza una postura inicial candidata de J (meñique extendido) o Z (índice extendido) y activa la rama temporal al detectar movimiento del dedo; durante la secuencia suprime letras estáticas. Una postura candidata sin movimiento expira y vuelve a la clasificación estática. `dynamic` ejecuta la rama temporal continuamente con ventanas móviles y sirve para evaluarla aparte; `static` desactiva la temporal. Los umbrales son iniciales y se deben ajustar con cámara real. **Iniciar captura** acumula letras estables; **Detener y revisar texto** pausa la captura y ofrece sugerencias ortográficas en inglés con un diccionario local. `space` separa palabras, `del` borra el último carácter y `nothing`/`other` no añaden letras. El corrector sugiere ortografía por palabra; no es un modelo de gramática ni un traductor de lengua de señas.
 
-Si `video/jz_flow_cnn.keras` no está instalado, la app funciona solo con la rama estática. La ventana temporal y los umbrales son iniciales; deben ajustarse después de evaluar clips reales. En Windows la inferencia puede ejecutarse en CPU, aunque la velocidad dependerá del equipo.
+Si no está instalado ninguno de los modelos temporales, la app funciona solo con la rama estática. En el modelo de mapas se usa un umbral inicial de confianza de 0.50; en el de flujo óptico se conserva 0.80. Esos valores son provisionales, no calibrados para una aplicación final. La inferencia local se ejecuta en CPU, aunque la velocidad dependerá del equipo.
 
 ## Evaluación y limitaciones
 

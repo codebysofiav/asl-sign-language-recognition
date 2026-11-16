@@ -110,6 +110,7 @@ class LiveApp:
         root.minsize(820, 640)
 
         self.mode = tk.StringVar(value="maps")
+        self.routing = tk.StringVar(value="auto")
         self.status = tk.StringVar(value="Cargando modelo y cámara…")
         self.prediction = tk.StringVar(value="Predicción: —")
         self.session = TextAccumulator()
@@ -123,6 +124,9 @@ class LiveApp:
         ttk.Label(top, text="Clasificador estático:").pack(side="left")
         ttk.Combobox(top, textvariable=self.mode, values=("maps", "crop"),
                      state="readonly", width=12).pack(side="left", padx=6)
+        ttk.Label(top, text="Enrutamiento:").pack(side="left", padx=(10, 0))
+        ttk.Combobox(top, textvariable=self.routing, values=("auto", "static", "dynamic"),
+                     state="readonly", width=10).pack(side="left", padx=6)
         self.reload_button = ttk.Button(top, text="Cargar rama", command=self.reload_engine)
         self.reload_button.pack(side="left", padx=5)
         ttk.Label(top, textvariable=self.status).pack(side="right")
@@ -166,14 +170,18 @@ class LiveApp:
     def reload_engine(self, show_message=True):
         try:
             from src.inference import RecognitionEngine
-            new_engine = RecognitionEngine(ARTIFACTS, static_mode=self.mode.get())
+            new_engine = RecognitionEngine(ARTIFACTS, static_mode=self.mode.get(), routing_mode=self.routing.get())
             old_engine = self.engine
             self.engine = new_engine
             if old_engine:
                 old_engine.close()
-            message = f"Modelo {self.mode.get()} cargado"
+            message = f"Estático {self.mode.get()} | enrutamiento {self.routing.get()}"
             if not self.engine.dynamic_available:
                 message += "; modelo temporal aún no instalado (solo estático)"
+            elif self.engine.dynamic_type == "maps":
+                message += "; temporal Notebook 14 (mapas de landmarks)"
+            else:
+                message += "; temporal de flujo óptico"
             self.status.set(message)
             if show_message:
                 messagebox.showinfo("Modelos cargados", message)
@@ -257,7 +265,7 @@ class LiveApp:
                 cv2.putText(display, mode_text, (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65,
                             (50, 210, 90) if self.session.active else (0, 180, 255), 2)
                 shown = label if label is not None else "uncertain"
-                cv2.putText(display, f"{shown}  {confidence:.2f}  [{source}]", (12, 56),
+                cv2.putText(display, f"{shown}  {confidence:.2f}  [{source}/{self.routing.get()}]", (12, 56),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.62, (255, 255, 255), 2)
                 if not detected:
                     cv2.putText(display, "Hand not detected", (12, 84), cv2.FONT_HERSHEY_SIMPLEX,
