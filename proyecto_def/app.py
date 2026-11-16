@@ -181,6 +181,33 @@ class EnglishSpeller:
         return "".join(corrected)
 
 
+class T5GrammarCorrector:
+    """Optional local, context-aware English correction using a small T5 model."""
+
+    model_name = "selfnify/proximity"
+
+    def __init__(self):
+        import torch
+        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+        self.torch = torch
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_name)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
+        self.model.eval()
+
+    def suggest(self, text: str) -> str:
+        prompt = f"grammar: {text}"
+        inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=256)
+        inputs = {key: value.to(self.device) for key, value in inputs.items()}
+        with self.torch.inference_mode():
+            output = self.model.generate(**inputs, max_new_tokens=128, num_beams=4,
+                                         early_stopping=True)
+        suggestion = self.tokenizer.decode(output[0], skip_special_tokens=True).strip()
+        return suggestion or text
+
+
 class TextAccumulator:
     def __init__(self, stable_frames: int = 6, confidence_threshold: float = 0.78):
         self.active = False
@@ -352,16 +379,25 @@ class LiveApp:
         if not text.strip():
             return
         try:
-            if self.corrector is None:
-                self.corrector = EnglishSpeller()
-        except ImportError as exc:
+            if hasattr(self, "_get_corrector") and self.corrector_mode.get() == "compare":
+                suggestions = {
+                    "Diccionario": self._get_corrector("dictionary").suggest(text),
+                    "T5-small": self._get_corrector("t5-small").suggest(text),
+                }
+                self.status.set("Comparación de correctores lista")
+                self._show_correction_comparison(text, suggestions)
+                return
+            corrector = (self._get_corrector(self.corrector_mode.get())
+                         if hasattr(self, "_get_corrector") else EnglishSpeller())
+            suggestion = corrector.suggest(text)
+            self.status.set("Captura detenida · sugerencia lista")
+        except Exception as exc:
             messagebox.showerror(
                 "Corrector unavailable",
-                "The English spelling package is not installed. Install requirements-local.txt "
-                "after fixing the Python package index certificate.\n\n" + str(exc),
+                "Could not load the selected English corrector. For T5, install the optional "
+                "requirements-corrector-t5.txt and allow the model to download on first use.\n\n" + str(exc),
             )
             return
-        suggestion = self.corrector.suggest(text)
         if suggestion != text:
             accept = messagebox.askyesno(
                 "English spelling suggestion",
@@ -445,6 +481,7 @@ class StyledLiveApp(LiveApp):
 
         self.mode = tk.StringVar(value="maps")
         self.routing = tk.StringVar(value="auto")
+        self.corrector_mode = tk.StringVar(value="dictionary")
         self.status = tk.StringVar(value="Preparando cámara…")
         self.prediction = tk.StringVar(value="Predicción: —")
         self.big_letter = tk.StringVar(value="—")
@@ -453,6 +490,7 @@ class StyledLiveApp(LiveApp):
         self.stats_text = tk.StringVar(value="0 caracteres • 0 palabras")
         self.session = TextAccumulator()  # conserva umbral y estabilidad actuales
         self.corrector = None
+        self.correctors = {}
         self.engine = None
         self.capture = None
         self.photo = None
@@ -546,6 +584,12 @@ class StyledLiveApp(LiveApp):
         text_header.pack(fill="x", pady=(0, 6))
         tk.Label(text_header, text="Texto deletreado", font=("Segoe UI", 11, "bold"),
                  bg=COLORS["card"], fg=COLORS["text"]).pack(side="left")
+        tk.Label(text_header, text="Corrector:", font=("Segoe UI", 9, "bold"),
+                 bg=COLORS["card"], fg=COLORS["muted"]).pack(side="left", padx=(16, 5))
+        self.corrector_combo = ttk.Combobox(text_header, textvariable=self.corrector_mode,
+                                            values=("dictionary", "t5-small", "compare"), state="readonly",
+                                            width=11, style="Pastel.TCombobox")
+        self.corrector_combo.pack(side="left")
         tk.Label(text_header, textvariable=self.stats_text, font=("Segoe UI", 9, "bold"),
                  bg=COLORS["sky_soft"], fg="#2B6CB0", padx=8, pady=3).pack(side="right")
         self.clear_button = RoundedButton(text_header, "Limpiar", self.clear_text,
@@ -622,6 +666,60 @@ class StyledLiveApp(LiveApp):
     def _update_stats(self):
         text = self.text_widget.get("1.0", "end-1c")
         self.stats_text.set(f"{len(text)} caracteres · {len(text.split()) if text.strip() else 0} palabras")
+
+    def _sync_text(self):
+        super()._sync_text()
+        self._update_stats()
+
+    def _get_corrector(self, mode=None):
+        mode = mode or self.corrector_mode.get()
+        if mode not in self.correctors:
+            if mode == "t5-small":
+                self.status.set("Cargando T5-small… (primera vez puede descargar el modelo)")
+                self.root.update_idletasks()
+                self.correctors[mode] = T5GrammarCorrector()
+            elif mode == "dictionary":
+                self.correctors[mode] = EnglishSpeller()
+            else:
+                raise ValueError(f"Corrector no reconocido: {mode}")
+        return self.correctors[mode]
+
+    def _show_correction_comparison(self, original, suggestions):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Comparar sugerencias de corrección")
+        dialog.configure(bg=COLORS["bg"])
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        tk.Label(dialog, text="Texto original", font=("Segoe UI", 10, "bold"),
+                 bg=COLORS["bg"], fg=COLORS["text"]).pack(anchor="w", padx=16, pady=(14, 3))
+        tk.Label(dialog, text=original, font=("Segoe UI", 11), wraplength=520, justify="left",
+                 bg=COLORS["card"], fg=COLORS["text"], padx=10, pady=8).pack(fill="x", padx=16)
+        result = {"text": None}
+        for name, suggestion in suggestions.items():
+            tk.Label(dialog, text=f"Sugerencia {name}", font=("Segoe UI", 10, "bold"),
+                     bg=COLORS["bg"], fg=COLORS["text"]).pack(anchor="w", padx=16, pady=(10, 3))
+            tk.Label(dialog, text=suggestion, font=("Segoe UI", 11), wraplength=520, justify="left",
+                     bg=COLORS["card"], fg=COLORS["text"], padx=10, pady=8).pack(fill="x", padx=16)
+            RoundedButton(dialog, f"Usar sugerencia {name}",
+                          command=lambda value=suggestion: choose(value),
+                          bg_color=COLORS["mint"], hover_color=COLORS["mint_hover"],
+                          padx=12, pady=5).pack(anchor="e", padx=16, pady=(5, 0))
+
+        def close_dialog():
+            dialog.destroy()
+
+        def choose(value):
+            result["text"] = value
+            close_dialog()
+
+        RoundedButton(dialog, "Conservar original", command=close_dialog,
+                      bg_color=COLORS["neutral"], hover_color=COLORS["neutral_hover"],
+                      fg_color=COLORS["text"], padx=12, pady=5).pack(anchor="e", padx=16, pady=12)
+        dialog.wait_window()
+        if result["text"] is not None:
+            self.session.text = result["text"]
+            self._sync_text()
 
     def update_frame(self):
         if not self.capture or not self.capture.isOpened():
