@@ -631,7 +631,7 @@ class StyledLiveApp(LiveApp):
             self.fps_smooth = fps if self.fps_smooth == 0 else 0.85 * self.fps_smooth + 0.15 * fps
             self.fps_text.set(f"{self.fps_smooth:.0f} FPS")
             if self.preview_only:
-                display = frame.copy()
+                display = cv2.flip(frame, 1)
                 cv2.putText(display, "VISTA PREVIA · SIN MODELO", (16, 34), cv2.FONT_HERSHEY_SIMPLEX,
                             0.75, (80, 145, 220), 2, cv2.LINE_AA)
                 self.prediction.set("Vista previa de cámara; la clasificación está desactivada.")
@@ -639,6 +639,9 @@ class StyledLiveApp(LiveApp):
                 if not self.engine:
                     return
                 display, label, confidence, source, detected = self.engine.predict(frame)
+                # Espejar el video anotado antes de dibujar texto para que los
+                # rótulos de predicción permanezcan legibles en pantalla.
+                display = cv2.flip(display, 1)
                 accepted = self.session.observe(label, confidence)
                 if accepted:
                     if accepted == "<":
@@ -667,9 +670,6 @@ class StyledLiveApp(LiveApp):
                 if not detected:
                     cv2.putText(display, "Muestra tu mano frente a la cámara", (14, 72),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.58, (120, 200, 255), 2, cv2.LINE_AA)
-            # Mirror only the rendered preview. The classifier always receives the
-            # original camera frame so its input matches training and preprocessing.
-            display = cv2.flip(display, 1)
             rgb = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
             image = Image.fromarray(rgb)
             image = resize_to_fit(image, self.video_holder.winfo_width(), self.video_holder.winfo_height())
