@@ -499,16 +499,19 @@ class StyledLiveApp(LiveApp):
         # Camera card and its unchanged start/stop controls
         self.video_card = RoundedCard(self.main, radius=20, padding=10)
         self.video_card.grid(row=1, column=0, sticky="nsew", padx=(0, 10), pady=(0, 10))
+        self.video_card.inner.columnconfigure(0, weight=1)
+        self.video_card.inner.rowconfigure(0, weight=1)
+        self.video_card.inner.rowconfigure(1, weight=0)
         self.video_holder = tk.Frame(self.video_card.inner, bg=COLORS["card"])
-        self.video_holder.pack(fill="both", expand=True)
+        self.video_holder.grid(row=0, column=0, sticky="nsew")
         self.video_view = tk.Label(self.video_holder, bg=COLORS["card"], anchor="center")
         self.video_view.pack(fill="both", expand=True)
         controls = tk.Frame(self.video_card.inner, bg=COLORS["card"])
-        controls.pack(fill="x", pady=(10, 0))
-        self.start_button = RoundedButton(controls, "▶  Iniciar captura", self.start_capture,
+        controls.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        self.start_button = RoundedButton(controls, "▶  Iniciar captura de letras", self.start_capture,
                                           bg_color=COLORS["mint"], hover_color=COLORS["mint_hover"])
         self.start_button.pack(side="left", padx=(0, 8))
-        self.stop_button = RoundedButton(controls, "■  Detener y revisar", self.stop_capture,
+        self.stop_button = RoundedButton(controls, "■  Detener y corregir texto", self.stop_capture,
                                          bg_color=COLORS["peach"], hover_color=COLORS["peach_hover"],
                                          state="disabled")
         self.stop_button.pack(side="left")
