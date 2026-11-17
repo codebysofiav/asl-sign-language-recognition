@@ -1,4 +1,4 @@
-# Python
+# Python environments, caches and compiled files
 __pycache__/
 *.py[cod]
 *.pyd
@@ -6,24 +6,45 @@ __pycache__/
 .venv/
 venv/
 env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Jupyter
+# Jupyter generated state
 .ipynb_checkpoints/
 
-# Local data and generated artifacts
-data/raw/*
-!data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
-models/*
-!models/.gitkeep
+# Local datasets and generated preprocessing
+/data/*
+!/data/.gitkeep
+/proyecto_def/data/
+/experiments/*/
+
+# Trained models, checkpoints, exports and MediaPipe assets
+/models/
+/checkpoints/
+/exports/
+/artifacts/
+/proyecto_def/artifacts/
+*.keras
+*.weights.h5
+*.tflite
+*.npy
+*.npz
+*.task
+*.tfevents.*
+
+# Video/image data collected for training
+*.avi
+*.mp4
+*.mov
+*.mkv
 
 # Local configuration and secrets
 .env
 .env.*
 !.env.example
 
-# OS / editor
+# Operating system and IDE files
 .DS_Store
 Thumbs.db
 .vscode/
