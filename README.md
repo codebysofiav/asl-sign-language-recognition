@@ -1,128 +1,111 @@
-# Clasificación de señas del alfabeto ASL
-![Imagen de la seña](https://github.com/codebysofiav/asl-sign-language-recognition/blob/main/image.png)
-Proyecto académico de IA2 para clasificar imágenes de señas del alfabeto de la Lengua de Señas Americana (ASL) mediante redes neuronales convolucionales. La primera meta es construir y evaluar una línea base reproducible con imágenes estáticas. El reconocimiento dinámico y en tiempo real queda como trabajo posterior, sujeto al tiempo y a los recursos disponibles.
+# ASL Fingerspelling Recognition — IA2
 
-## Estado
+Proyecto académico para reconocer letras del alfabeto ASL desde cámara. El prototipo combina clasificación estática de letras con reconocimiento temporal de J y Z. La app deletrea texto en inglés; no traduce ASL completo ni reconoce frases signadas.
 
-El proyecto ya cuenta con exploración y preprocesamiento, una CNN baseline y experimentos de transferencia de aprendizaje en `notebooks/03_entrenamiento_baseline.ipynb` y `notebooks/04_transfer_learning_comparacion.ipynb`. El siguiente experimento controla el preprocesamiento: localizar y recortar la mano con MediaPipe antes de pasar la imagen RGB a una CNN.
+## Estado y arquitectura
 
-## Dataset
+- **Estático (principal):** MediaPipe detecta la mano y dibuja mapas RGB de 21 puntos. MobileNetV2 clasifica las letras estáticas.
+- **Estático (comparación):** MediaPipe recorta la mano y MobileNetV2 clasifica la imagen recortada.
+- **Dinámico (principal):** para cada video se toman 17 fotogramas, se extraen los landmarks, se normaliza la secuencia y se crea un mapa por fotograma. Una CNN por fotograma más una GRU clasifica `J`, `Z` u `other`.
+- **App local:** abre la cámara y ofrece enrutamiento `auto`, `static` o `dynamic`. En `auto`, una compuerta heurística de postura y movimiento activa temporalmente la rama J/Z. La interfaz añade letras estables al texto entre **Iniciar captura de letras** y **Detener y corregir texto**.
+- **Corrección:** el diccionario `pyspellchecker` es la opción predeterminada. La app también incluye T5-small como corrector contextual opcional; requiere instalar sus dependencias adicionales.
 
-Dataset inicial: [ASL Alphabet en Kaggle](https://www.kaggle.com/datasets/grassknoted/asl-alphabet).
+La captura de J/Z y la detección automática siguen siendo experimentales. Las métricas de los videos y las condiciones de cámara limitan la precisión esperada.
 
-1. Descarga el dataset desde Kaggle y extrae los archivos en `data/raw/`.
-2. No subas imágenes del dataset a GitHub. La carpeta `data/raw/` está excluida por `.gitignore`.
-3. Abre `notebooks/01_exploracion_datos.ipynb` y configura allí la ruta local si la estructura extraída lo requiere.
-4. Registra en el notebook la estructura, conteos y observaciones reales; no des por hecho nombres de carpetas o cantidad de imágenes.
+## Notebooks
 
-Cada integrante necesita obtener su propia copia local del dataset o coordinar un almacenamiento compartido aprobado. El código debe trabajar con rutas configurables y relativas al repositorio, no con rutas absolutas de una computadora.
+Los notebooks se conservan para exploración, comparación y entrenamiento. Los notebooks 10–14 son los del pipeline definitivo en Colab:
 
-## Entorno local
+| Notebook | Propósito | Uso en el prototipo |
+| --- | --- | --- |
+| `proyecto_def/notebooks/10_entrenamiento_mapas_colab.ipynb` | Entrena la rama estática con mapas de landmarks. | Principal |
+| `proyecto_def/notebooks/11_entrenamiento_recortes_colab.ipynb` | Entrena la alternativa de recortes de mano. | Comparación |
+| `proyecto_def/notebooks/12_entrenamiento_video_flujo_colab.ipynb` | Experimento temporal con flujo óptico. | Fallback/comparación |
+| `proyecto_def/notebooks/13_entrenamiento_video_jz_rechazo_colab.ipynb` | Experimento J/Z binario con rechazo. | Comparación; no lo carga actualmente la app |
+| `proyecto_def/notebooks/14_entrenamiento_video_mapas_colab.ipynb` | Entrena la rama temporal CNN + GRU con mapas de 21 puntos. | Principal para J/Z |
 
-Se recomienda Python 3.10 o 3.11 de 64 bits y un entorno virtual por integrante. Desde la raíz del repositorio:
+Los notebooks `notebooks/01`–`04` son exploración, preprocesamiento y primeras comparaciones Keras. Permanecen junto con `src/` y `configs/` porque esos notebooks los usan; son antecedentes del pipeline definitivo.
+
+## Datos y entrenamiento en Colab
+
+Los datos no se guardan en GitHub. En Google Drive, los notebooks definitivos esperan:
+
+```text
+proyecto-ia2/
+├── dataset_asl/final_dataset/<clase>/<imagen>    # conjunto estático variado
+├── data/videos_jz/
+│   ├── J/<signante>/<video>
+│   ├── Z/<signante>/<video>
+│   └── other/<signante>/<video>
+├── data/raw/                                     # ASL Alphabet original, opcional
+└── exports/proyecto_def/                         # modelos, métricas y checkpoints
+```
+
+Ejecuta el notebook 10 para el modelo estático principal y el 14 para el temporal basado en puntos. El 11 permite comparar recortes. Los notebooks 12 y 13 son experimentos alternativos. Los checkpoints, manifiestos y resultados se guardan en Drive para poder reanudar después de una desconexión de Colab. No subas datasets, pesos ni checkpoints a GitHub.
+
+## Archivos de modelos para la app
+
+Después del entrenamiento, descarga desde `exports/proyecto_def/` únicamente los artefactos que necesita la inferencia y colócalos así:
+
+```text
+proyecto_def/artifacts/
+├── hand_landmarker.task
+├── maps/
+│   ├── model.keras
+│   └── classes.json
+├── crop/                         # opcional, para comparar la rama de recortes
+│   ├── model.keras
+│   └── classes.json
+├── video_map/                    # modelo temporal recomendado (Notebook 14)
+│   ├── jz_landmark_map_gru.keras
+│   ├── classes.json
+│   └── metadata.json
+└── video/                        # opcional, fallback de flujo óptico
+    ├── jz_flow_cnn.keras
+    └── classes.json
+```
+
+Orígenes en Drive:
+
+- Mapas estáticos: `exports/proyecto_def/maps/integrated_varied_1724/`.
+- Recortes: `exports/proyecto_def/crop/integrated_varied_1724/`.
+- Mapas temporales: `exports/proyecto_def/video_map_sequence_v1/`.
+- Flujo óptico alternativo: la carpeta de exportación del entrenamiento de Notebook 12, por ejemplo `exports/proyecto_def/video_balanced_v3/`.
+- MediaPipe: `exports/proyecto_def/hand_landmarker.task`.
+
+La app carga primero `video_map/` si está presente; si falta, intenta cargar el modelo anterior de flujo óptico en `video/`. Para la rama estática seleccionada se requieren su modelo y `classes.json`. No se necesitan los datasets, mapas preprocesados, archivos de flujo óptico ni checkpoints para ejecutar la app.
+
+## Instalación y ejecución local
+
+Usa Python 3.10 u 3.11. Desde la raíz del repositorio, crea y activa un entorno virtual; luego instala las dependencias de la app:
 
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r proyecto_def/requirements-local.txt
+cd proyecto_def
+python app.py
 ```
 
-En VS Code, selecciona el intérprete de `.venv` como kernel del notebook. El proyecto no requiere Docker para comenzar; el equipo puede compartir el mismo `requirements.txt` y las instrucciones anteriores.
+`python app.py --preview-only` abre la cámara sin cargar los modelos. `requirements.txt` en la raíz se conserva para los notebooks 01–04; `proyecto_def/requirements-local.txt` instala la app.
 
-> TensorFlow puede ejecutarse en Windows nativo con CPU. Para usar GPU NVIDIA con TensorFlow en Windows se requiere WSL2; las versiones posteriores a TensorFlow 2.10 no ofrecen soporte GPU nativo para Windows. El entrenamiento también puede trasladarse después a Colab o al clúster si se confirma el acceso.
+En la app, elige `maps` o `crop` para el clasificador estático y `auto`, `static` o `dynamic` para el enrutamiento; pulsa **Aplicar** después de cambiar la selección. **Iniciar captura de letras** permite acumular texto. **Detener y corregir texto** finaliza la captura y muestra una sugerencia ortográfica en inglés si la encuentra. `space` agrega un espacio, `del` elimina el último carácter, y `nothing`/`other` no escriben letras.
+
+### Experimento T5 opcional
+
+Para probar T5-small, instala o actualiza las dependencias opcionales desde `proyecto_def` con `python -m pip install --upgrade -r requirements-corrector-t5.txt`. Esta opción usa Transformers 5 para ser compatible con la configuración de tokenizer publicada. El selector **Corrector** permite elegir el diccionario actual, T5-small o comparar ambos. El modelo se descarga a la caché local de Hugging Face la primera vez y las sugerencias se confirman antes de reemplazar el texto. T5-small tiene licencia Apache 2.0; su ficha describe un modelo de 60.5 millones de parámetros entrenado para corrección gramatical, pero sigue siendo experimental y puede cambiar texto correcto. Una palabra válida aislada como `boughs` puede permanecer igual sin contexto suficiente para inferir `bought` ([ficha del modelo](https://huggingface.co/selfnify/proximity)).
+
+## Métricas y limitaciones
+
+Reporta accuracy y macro F1, revisa matrices de confusión y resultados por signante. Los splits de imágenes pueden contener dependencia de fuente/persona; los de video dependen de que los identificadores de signante estén bien organizados. Los resultados no deben presentarse como una traducción completa de ASL ni como rendimiento garantizado en cualquier cámara o fondo.
 
 ## Estructura
 
 ```text
-configs/       Configuración de experimentos
-data/raw/      Dataset original local (ignorado por Git)
-data/processed/ Datos derivados locales (ignorados por Git)
-models/        Pesos y modelos entrenados (ignorados por Git)
-notebooks/     Exploración y experimentos documentados
-results/       Métricas y figuras de experimentos (revisar antes de subir)
-src/           Código reutilizable del proyecto
-test/          Pruebas del proyecto
+notebooks/                 # exploración y comparaciones iniciales
+src/                       # código de soporte de notebooks 01–04
+configs/                   # configuraciones de esas comparaciones
+results/                   # métricas que se conservan
+proyecto_def/               # app local, notebooks finales y código de inferencia
 ```
-
-## Experimento: recorte de mano + CNN
-
-El recorte se prepara fuera del entrenamiento para poder reutilizar los mismos archivos con varias arquitecturas. Las configuraciones `baseline_handcrop.yaml`, `mobilenetv2_handcrop.yaml` y `efficientnetb0_handcrop.yaml` separan cada corrida; el notebook `05_mediapipe_cnn.ipynb` documenta el orden de comparación.
-
-```bash
-python scripts/download_hand_model.py
-
-# Preprocesar el dataset original una vez (puede tardar en una CPU)
-python scripts/prepare_hand_crops.py \
-  --input data/raw/asl_alphabet_train/asl_alphabet_train \
-  --output data/processed/hand_crops/asl_alphabet_train \
-  --manifest data/processed/hand_crops/asl_alphabet_train_manifest.csv
-
-# Entrenar el mismo baseline sobre las imágenes recortadas
-python -m src.train --config configs/baseline_handcrop.yaml --name baseline_handcrop
-
-# Las CNN preentrenadas usan los mismos recortes
-python -m src.train --config configs/mobilenetv2_handcrop.yaml --name mobilenetv2_handcrop
-python -m src.train --config configs/efficientnetb0_handcrop.yaml --name efficientnetb0_handcrop
-
-# Preprocesar fotos externas y evaluar el flujo completo
-python scripts/prepare_hand_crops.py --input data/mis_fotos \
-  --output data/processed/hand_crops/mis_fotos \
-  --manifest data/processed/hand_crops/mis_fotos_manifest.csv
-python scripts/evaluate_hand_crop.py --run experiments/AAAAMMDD-HHMM_baseline_handcrop
-```
-
-El manifiesto registra qué imágenes tuvieron mano detectada. Las muestras sin detección se excluyen del ajuste y la validación del clasificador (salvo `nothing`); en la métrica end-to-end, cualquier seña sin detección se predice como `nothing` y cuenta como error. Por eso cada corrida guarda tanto las métricas condicionales del clasificador como `pipeline_metrics.json`, la matriz end-to-end y predicciones por imagen. El CSV de fotos externas queda dentro de la carpeta de la corrida.
-
-## Plan de trabajo
-
-1. Comparar CNN baseline de imagen completa contra la misma CNN con recorte MediaPipe.
-2. Evaluar MobileNetV2 y EfficientNetB0 sobre los mismos recortes.
-3. Comparar las métricas internas y las fotos externas, incluida la tasa de detección.
-4. Después de estabilizar la comparación estática, explorar mapas de puntos y reconocimiento temporal.
-
-No se deben subir al repositorio datasets completos, credenciales, entornos virtuales ni archivos grandes de entrenamiento. Las métricas y figuras que se decida conservar para documentar experimentos deben revisarse antes de agregarlas a Git.
-
-## Prototipo con puntos de referencia de MediaPipe
-
-Este experimento extrae 21 puntos de la mano por imagen, los centra en la muñeca y los escala por el tamaño de la palma. Luego entrena un MLP con las características del dataset original y puede evaluar fotos propias sin usarlas para entrenar.
-
-En este dataset la clase `nothing` está representada por imágenes sin mano. La regla del experimento asigna esa clase cuando MediaPipe no detecta una mano; si no detecta una mano en otra clase, esa predicción cuenta como error en la evaluación.
-
-```bash
-python scripts/download_hand_model.py
-
-# Prueba inicial: 5 imágenes escogidas al azar por clase
-python scripts/extract_hand_landmarks.py \
-  --input data/raw/asl_alphabet_train/asl_alphabet_train \
-  --output data/processed/landmarks_pilot.npz \
-  --max-per-class 5
-
-# Lote completo del dataset de entrenamiento
-python scripts/extract_hand_landmarks.py \
-  --input data/raw/asl_alphabet_train/asl_alphabet_train \
-  --output data/processed/train_landmarks.npz
-
-# Después de copiar las fotos externas a data/mis_fotos/<clase>/
-python scripts/extract_hand_landmarks.py \
-  --input data/mis_fotos \
-  --output data/processed/own_photos_landmarks.npz
-
-# Entrenar y evaluar; las fotos externas solo se usan para evaluación
-python scripts/train_landmark_classifier.py \
-  --features data/processed/train_landmarks.npz \
-  --external-features data/processed/own_photos_landmarks.npz
-```
-
-Las imágenes, el archivo `.task`, las características `.npz` y el modelo quedan bajo carpetas excluidas de Git. El script guarda las métricas en `results/metrics/landmark_classifier.json`; revísalas antes de decidir si agregarlas al repositorio. Las pruebas de reconocimiento con fotos propias deben reportarse aparte del test interno del dataset.
-
-## Prototipo de cámara local
-
-`scripts/live_camera.py` carga el modelo estático de mapas de `09_pipeline_mapas_25k.ipynb` y, si existe, el modelo temporal J/Z de `07_pipeline_temporal_integracion.ipynb`. Descarga desde Drive a las rutas locales los modelos `.keras`, `classes.json` y `hand_landmarker.task`; esos artefactos no se guardan en Git.
-
-```bash
-python -m pip install -r requirements.txt
-python scripts/live_camera.py
-```
-
-Por defecto, busca el modelo estático en `data/processed/pipeline_mapas_25k/model/` y el temporal en `data/processed/video_flow/`. Si el modelo temporal aún no existe, la app funciona solo con el estático. Usa `S` para iniciar/detener la acumulación de letras, `C` para borrar el texto y `Q` para cerrar. La inferencia temporal usa ventanas deslizantes; su duración y umbrales son valores iniciales que deben calibrarse con clips reales.

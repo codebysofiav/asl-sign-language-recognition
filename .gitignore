@@ -1,4 +1,4 @@
-# Python
+# Python environments, caches and compiled files
 __pycache__/
 *.py[cod]
 *.pyd
@@ -6,26 +6,45 @@ __pycache__/
 .venv/
 venv/
 env/
-
-# Jupyter and test caches
-.ipynb_checkpoints/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Local data and generated artifacts
-data/
-experiments/
-models/*
-!models/.gitkeep
-*.zip
+# Jupyter generated state
+.ipynb_checkpoints/
+
+# Local datasets and generated preprocessing
+/data/*
+!/data/.gitkeep
+/proyecto_def/data/
+/experiments/*/
+
+# Trained models, checkpoints, exports and MediaPipe assets
+/models/
+/checkpoints/
+/exports/
+/artifacts/
+/proyecto_def/artifacts/
+*.keras
+*.weights.h5
+*.tflite
+*.npy
+*.npz
+*.task
+*.tfevents.*
+
+# Video/image data collected for training
+*.avi
+*.mp4
+*.mov
+*.mkv
 
 # Local configuration and secrets
 .env
 .env.*
 !.env.example
 
-# OS, editor, and CUDA files
+# Operating system and IDE files
 .DS_Store
 Thumbs.db
 .vscode/
-ptxas
-*:Zone.Identifier

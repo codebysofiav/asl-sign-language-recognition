@@ -1,0 +1,3 @@
+# Only needed for camera/window preview; no TensorFlow, MediaPipe or spell checker.
+opencv-python>=4.8,<5
+Pillow>=10
