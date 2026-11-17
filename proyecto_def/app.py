@@ -188,7 +188,15 @@ class T5GrammarCorrector:
 
     def __init__(self):
         import torch
+        import transformers
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+        from packaging.version import Version
+
+        if Version(transformers.__version__) < Version("5.0"):
+            raise RuntimeError(
+                f"T5-small requiere transformers>=5.0; tienes {transformers.__version__}. "
+                "Actualiza con: python -m pip install --upgrade -r requirements-corrector-t5.txt"
+            )
 
         self.torch = torch
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -394,8 +402,9 @@ class LiveApp:
         except Exception as exc:
             messagebox.showerror(
                 "Corrector unavailable",
-                "Could not load the selected English corrector. For T5, install the optional "
-                "requirements-corrector-t5.txt and allow the model to download on first use.\n\n" + str(exc),
+                "No se pudo cargar o ejecutar el corrector seleccionado. Actualiza las dependencias "
+                "opcionales de T5 y permite la descarga del modelo en el primer uso.\n\n"
+                f"Detalle: {type(exc).__name__}: {exc}",
             )
             return
         if suggestion != text:

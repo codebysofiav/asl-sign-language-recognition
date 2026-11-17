@@ -94,7 +94,7 @@ En la app, elige `maps` o `crop` para el clasificador estático y `auto`, `stati
 
 ### Experimento T5 opcional
 
-En la rama `codex/t5-correction-experiment`, instala además `python -m pip install -r requirements-corrector-t5.txt` desde `proyecto_def`. El selector **Corrector** permite elegir el diccionario actual, T5-small o comparar ambos. El modelo se descarga a la caché local de Hugging Face la primera vez y las sugerencias se confirman antes de reemplazar el texto. T5-small tiene licencia Apache 2.0; su ficha describe un modelo de 60.5 millones de parámetros entrenado para corrección gramatical, pero sigue siendo experimental y puede cambiar texto correcto. Una palabra válida aislada como `boughs` puede permanecer igual sin contexto suficiente para inferir `bought` ([ficha del modelo](https://huggingface.co/selfnify/proximity)).
+En la rama `codex/t5-correction-experiment`, instala o actualiza las dependencias opcionales desde `proyecto_def` con `python -m pip install --upgrade -r requirements-corrector-t5.txt`. Esta prueba usa Transformers 5 para ser compatible con la configuración de tokenizer publicada. El selector **Corrector** permite elegir el diccionario actual, T5-small o comparar ambos. El modelo se descarga a la caché local de Hugging Face la primera vez y las sugerencias se confirman antes de reemplazar el texto. T5-small tiene licencia Apache 2.0; su ficha describe un modelo de 60.5 millones de parámetros entrenado para corrección gramatical, pero sigue siendo experimental y puede cambiar texto correcto. Una palabra válida aislada como `boughs` puede permanecer igual sin contexto suficiente para inferir `bought` ([ficha del modelo](https://huggingface.co/selfnify/proximity)).
 
 ## Métricas y limitaciones
 
